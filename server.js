@@ -1,88 +1,9 @@
-// // //server back
-// const express = require("express");
-// const http = require("http");
-// const io = require("socket.io")();
-// const mongoose = require("mongoose");
-// const bodyParser = require("body-parser");
-// const User = require("./User");
-
-// const router = express.Router();
-// const jsonBodyParser = bodyParser.json();
-
-// express.use(bodyParser);
-
-// router.post("/qwe", jsonBodyParser, async ({ body }, res, next) => {
-//   try {
-//     const user = await body;
-//     console.log("user body", user);
-//     res.status(200).json({ body });
-//   } catch (e) {
-//     res.status(401).json({ error: e.message });
-//   }
-// });
-
-// router.post("/", async ({ body }, res) => {
-//   const user = new User({
-//     email: body.title,
-//     nickname: body.title,
-//   });
-//   console.log(user);
-//   // await user.save();
-//   console.log("user save....");
-//   // res.redirect('/')
-// });
-
-// io.on("connection", (client) => {
-//   client.on("subscribeToTimer", (interval) => {
-//     console.log("client is subscribing to timer with interval ", interval);
-
-//     setInterval(() => {
-//       client.emit("timer", new Date());
-//     }, interval);
-
-//     connectWithDB();
-//   });
-// });
-
-// async function connectWithDB() {
-//   try {
-//     await mongoose.createConnection(
-//       "mongodb+srv://ost:1q2w3e@cluster0.y9jnl.mongodb.net/chat?retryWrites=true&w=majority",
-//       {
-//         useNewUrlParser: true,
-//         useUnifiedTopology: true,
-//         useFindAndModify: false,
-//       }
-//     );
-//     // createUserInDB();
-//     console.log("in function 'connect!'");
-//   } catch (e) {
-//     console.log("error.....", e);
-//   }
-// }
-
-// //работает
-// // function createUserInDB() {
-// //   const user = new User({
-// //     email: "qweqeq@gmail.com",
-// //     nickname: "Bob",
-// //   });
-
-// //   user.save();
-// //   console.log("user save....");
-// // }
-
-// const port = 3001;
-// io.listen(port);
-// console.log("listening on port ", port);
-//=====================================================================
 const app = require("express")();
 const server = require("http").createServer(app);
 const io = require("socket.io")(server);
 const cors = require("cors");
 const mongoose = require("mongoose");
 const bodyParser = require("body-parser");
-// const collection = mongodb.db("chat").collection("users");
 
 const User = require("./User");
 app.use(bodyParser.json());
@@ -94,16 +15,20 @@ const corsOptions = {
 };
 
 //connect socket
-io.on("connection", (client) => {
-  client.on("subscribeToTimer", (interval) => {
-    console.log("client is subscribing to timer with interval ", interval);
+io.on("connection", (socket) => {
+  console.log("socket in server connect");
 
-    setInterval(() => {
-      client.emit("timer", new Date());
-    }, interval);
-
-    connectWithDB();
+  socket.on("chatMessage", (message) => {
+    io.emit("message", message);
   });
+  // client.on("subscribeToTimer", (interval) => {
+  //   console.log("client is subscribing to timer with interval ", interval);
+
+  //   setInterval(() => {
+  //     client.emit("timer", new Date());
+  //   }, interval);
+  // });
+  connectWithDB();
 });
 
 let newUser;
@@ -114,56 +39,75 @@ app.post("/", function (request, response) {
   console.log("body", request.body);
   newUser = {
     email: request.body.email,
+    password: request.body.password,
     nickname: request.body.name,
   };
-  // createUserInDB(request.body.email, request.body.name);
-  response.send(`${request.body.email}`);
+  validationUserData(newUser);
+  //delete
+  response.send(`data send`);
 });
+
+const validationUserData = (user) => {
+  if (!/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,4}$/i.test(user.email)) {
+    console.log("bad email");
+  } else {
+    newUser.email = user.email;
+  }
+  if (/^[^%/&?,';:!-+!@#$^*)(]{3,15}$/i.test(user.nickname)) {
+    newUser.nickname = user.nickname;
+  } else {
+    console.log("name bad");
+  }
+  if (user.password === "") {
+    console.log("password short");
+  }
+  if (user.password.length < 6) {
+    console.log("меньше 6ти");
+  }
+  console.log("new", newUser);
+};
 
 //connect with mongoDB
 async function connectWithDB() {
   try {
-    await mongoose.createConnection(
+    await mongoose.connect(
       "mongodb+srv://ost:1q2w3e@cluster0.y9jnl.mongodb.net/chat?retryWrites=true&w=majority",
       {
         useNewUrlParser: true,
         useUnifiedTopology: true,
         useFindAndModify: false,
+        useCreateIndex: true,
       }
     );
     console.log("in function 'connect!'");
-    // createUserInDB(newUser);
-    createUserInDB();
+    createUserInDB(newUser);
   } catch (e) {
     console.log("error.....", e);
   }
 }
 
 //create user in DB
-//not working
-// async function createUserInDB(newUser) {
-//   // const user = new User({
-//   //   email: email,
-//   //   nickname: name,
-//   // });
-//   const user = new User({
-//     email: newUser.email,
-//     nickname: newUser.nickname,
-//   });
-
-//   await user.save();
-//   console.log("user save....");
-// }
-function createUserInDB() {
+function createUserInDB(obj) {
   // const user = new User({
-  //   email: "qdssfdfdsfwfgdgdv@gmail.com",
-  //   nickname: "Bobi",
+  //   email: obj.email,
+  //   nickname: obj.nickname,
   // });
-  collection.insert({
-    email: "qdssfdfdsfwfgdgdv@gmail.com",
-    nickname: "Bobi",
-  });
-  // user.save();
+  const user = new User({ obj });
+  user.save();
   console.log("user save....");
 }
 server.listen(3001);
+
+// function createUserInDB() {
+//   // const user = new User({
+//   //   email: "qdssfdfdsfwfgdgdv@gmail.com",
+//   //   nickname: "Bobi",
+//   // });
+//   const user = new User({
+//     email: "lol@gmail.com",
+//     nickname: "Bobi",
+//   });
+//   user.save();
+//   console.log("user save....");
+// }
+// server.listen(3001);
