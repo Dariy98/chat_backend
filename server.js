@@ -6,8 +6,10 @@ const mongoose = require("mongoose");
 const bodyParser = require("body-parser");
 const socketioJwt = require("socketio-jwt");
 const jwt = require("jsonwebtoken");
+const schema = require("./validation");
 
 const User = require("./User");
+const { request } = require("express");
 
 app.use(bodyParser.json());
 app.use(cors());
@@ -62,12 +64,25 @@ const corsOptions = {
 //     console.log(`hello! ${socket.decoded_token.name}`);
 //   });
 
+// const { error, value } = schema.validate({
+//   nickname: "oxsax@$44",
+//   password: "24",
+// });
+// console.log("error", error);
+// console.log("value", value);
+
 //accept request with data for mongoDB
 app.post("/auth", async (request, response) => {
   if (!request.body) {
     return response.sendStatus(400);
   }
   console.log("body", request.body);
+
+  const { error, value } = schema.validate(request.body);
+
+  if (error) {
+    return response.json({ ValidationError });
+  }
 
   //find user in DB
   const user = await User.findOne({
@@ -76,11 +91,8 @@ app.post("/auth", async (request, response) => {
 
   // user exist
   if (user) {
-    // validate pass!!!
-
     if (user.password === request.body.password) {
       // return token
-      debugger;
       const token = generateToken(user);
       return response.json({ token }).status(201);
     } else {
@@ -93,8 +105,6 @@ app.post("/auth", async (request, response) => {
   // return token
   const token = generateToken(newUser);
   return response.json({ token }).status(201);
-
-  response.send(`data is send`);
 });
 
 //connect with mongoDB

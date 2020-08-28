@@ -4,9 +4,6 @@ const schema = new Schema({
   id: {
     type: Schema.ObjectId,
   },
-  email: {
-    type: String,
-  },
   password: {
     type: String,
   },
