@@ -10,7 +10,7 @@ const schema = new Schema({
   nickname: {
     type: String,
   },
-  idAdmin: {
+  isAdmin: {
     type: Boolean,
     default: false,
   },

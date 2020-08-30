@@ -4,7 +4,6 @@ const io = require("socket.io")(server);
 const cors = require("cors");
 const mongoose = require("mongoose");
 const bodyParser = require("body-parser");
-const socketioJwt = require("socketio-jwt");
 const jwt = require("jsonwebtoken");
 const schema = require("./validation");
 
@@ -32,44 +31,11 @@ const corsOptions = {
   optionsSuccessStatus: 200,
 };
 
-//connect socket
-// io.on("connection", (socket) => {
-//   console.log("socket in server connect");
-
-//   socket.on("chatMessage", (message) => {
-//     io.emit("message", message);
-//   });
-//   // client.on("subscribeToTimer", (interval) => {
-//   //   console.log("client is subscribing to timer with interval ", interval);
-
-//   //   setInterval(() => {
-//   //     client.emit("timer", new Date());
-//   //   }, interval);
-//   // });
-//   connectWithDB();
-// });
-
-//auth-socketio-jwt
-// set authorization for socket.io !!!
-// io.sockets
-//   .on(
-//     "connection",
-//     socketioJwt.authorize({
-//       secret: "your secret or public key",
-//       timeout: 15000, // 15 seconds to send the authentication message
-//     })
-//   )
-//   .on("authenticated", (socket) => {
-//     //this socket is authenticated, we are good to handle more events from it.
-//     console.log(`hello! ${socket.decoded_token.name}`);
-//   });
-
 // const { error, value } = schema.validate({
 //   nickname: "oxsax@$44",
 //   password: "24",
 // });
 // console.log("error", error);
-// console.log("value", value);
 
 //accept request with data for mongoDB
 app.post("/auth", async (request, response) => {
@@ -94,17 +60,55 @@ app.post("/auth", async (request, response) => {
     if (user.password === request.body.password) {
       // return token
       const token = generateToken(user);
+
       return response.json({ token }).status(201);
     } else {
       return response.status(401);
     }
   }
 
-  // create new user
+  // else create new user
   const newUser = await createUser(request.body);
+
   // return token
   const token = generateToken(newUser);
+
   return response.json({ token }).status(201);
+});
+
+//connect socket
+io.use(async (socket, next) => {
+  try {
+    const token = socket.handshake.query.token;
+    const payload = await jwt.verify(token, secretKey);
+
+    socket.userId = payload._id;
+    socket.name = payload.nickname;
+    next();
+  } catch (err) {
+    console.log("error in socket with token....");
+  }
+});
+
+io.on("connection", (socket) => {
+  console.log("Connected: " + socket.name + " - id - ", socket.userId);
+
+  // //WELCOME CURRENT USER
+  socket.emit("message", "Welcome to chat");
+
+  //USER connect
+  socket.broadcast.emit("message", `user ${socket.name} online`);
+
+  socket.on("disconnect", () => {
+    console.log("Disconnected: " + socket.name);
+  });
+
+  socket.on("chatMessage", (message) => {
+    // io.emit("message", message);
+    io.emit("message", `user ${socket.name}: ${message}`);
+
+    console.log(message);
+  });
 });
 
 //connect with mongoDB
