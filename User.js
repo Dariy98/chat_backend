@@ -14,6 +14,18 @@ const schema = new Schema({
     type: Boolean,
     default: false,
   },
+  isOnline: {
+    type: Boolean,
+    default: false,
+  },
+  isBane: {
+    type: Boolean,
+    default: false,
+  },
+  isMute: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 module.exports = model("User", schema);

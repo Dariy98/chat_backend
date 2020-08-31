@@ -8,6 +8,7 @@ const jwt = require("jsonwebtoken");
 const schema = require("./validation");
 
 const User = require("./User");
+const Message = require("./Message");
 const { request } = require("express");
 
 app.use(bodyParser.json());
@@ -30,12 +31,6 @@ const corsOptions = {
   origin: "http://localhost:3000/",
   optionsSuccessStatus: 200,
 };
-
-// const { error, value } = schema.validate({
-//   nickname: "oxsax@$44",
-//   password: "24",
-// });
-// console.log("error", error);
 
 //accept request with data for mongoDB
 app.post("/auth", async (request, response) => {
@@ -90,22 +85,54 @@ io.use(async (socket, next) => {
   }
 });
 
-io.on("connection", (socket) => {
+io.on("connection", async (socket) => {
   console.log("Connected: " + socket.name + " - id - ", socket.userId);
 
+  //update user online
+  await User.findOneAndUpdate(
+    { _id: socket.userId },
+    { isOnline: true },
+    { new: true }
+  );
+
+  //get users and send for online list
+  const allUsers = await User.find({});
+  if (allUsers.length) {
+    socket.emit("result", allUsers);
+    socket.broadcast.emit("result", allUsers);
+  }
+
   // //WELCOME CURRENT USER
-  socket.emit("message", "Welcome to chat");
+  // socket.emit("message", "Welcome to chat");
 
   //USER connect
-  socket.broadcast.emit("message", `user ${socket.name} online`);
+  // socket.broadcast.emit("message", `user ${socket.name} online`);
 
-  socket.on("disconnect", () => {
+  socket.on("disconnect", async () => {
     console.log("Disconnected: " + socket.name);
+
+    //update status online = false
+    await User.findOneAndUpdate(
+      { _id: socket.userId },
+      { isOnline: false },
+      { new: true }
+    );
+
+    //get users and send for online list
+    const allUsers = await User.find({});
+    if (allUsers.length) {
+      socket.emit("result", allUsers);
+      socket.broadcast.emit("result", allUsers);
+      // console.log(allUsers);
+    }
   });
 
   socket.on("chatMessage", (message) => {
-    // io.emit("message", message);
-    io.emit("message", `user ${socket.name}: ${message}`);
+    io.emit("message", {
+      id: socket.userId,
+      user: socket.name,
+      message,
+    });
 
     console.log(message);
   });
