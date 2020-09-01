@@ -72,6 +72,8 @@ app.post("/auth", async (request, response) => {
 });
 
 //connect socket
+const connections = {};
+
 io.use(async (socket, next) => {
   try {
     const token = socket.handshake.query.token;
@@ -80,6 +82,8 @@ io.use(async (socket, next) => {
     socket.userId = payload._id;
     socket.name = payload.nickname;
     socket.isBane = payload.isBane;
+    socket.isAdmin = payload.isAdmin;
+    socket.isMute = payload.isMute;
     next();
   } catch (err) {
     console.log("error in socket with token....");
@@ -95,6 +99,9 @@ io.on("connection", async (socket) => {
     console.log(`user ${socket.userId} disconnect because "ban"`);
   }
 
+  connections[socket.userId] = socket;
+  connections[socket.isMute] = socket.isMute;
+
   //update user online
   await User.findOneAndUpdate(
     { _id: socket.userId },
@@ -108,12 +115,6 @@ io.on("connection", async (socket) => {
     socket.emit("result", allUsers);
     socket.broadcast.emit("result", allUsers);
   }
-
-  // //WELCOME CURRENT USER
-  // socket.emit("message", "Welcome to chat");
-
-  //USER connect
-  // socket.broadcast.emit("message", `user ${socket.name} online`);
 
   socket.on("disconnect", async () => {
     console.log("Disconnected: " + socket.name);
@@ -130,31 +131,96 @@ io.on("connection", async (socket) => {
     if (allUsers.length) {
       socket.emit("result", allUsers);
       socket.broadcast.emit("result", allUsers);
-      // console.log(allUsers);
     }
   });
 
-  socket.on("chatMessage", (message) => {
-    io.emit("message", {
-      id: socket.userId,
-      user: socket.name,
-      message,
-    });
+  // let connectionToMute;
+  let forMessage = false;
 
-    console.log(message);
+  socket.on("chatMessage", (message) => {
+    console.log("in chat", forMessage);
+    // if (!connectionToMute) {
+    if (forMessage) {
+      console.log("user mute and can't send message");
+    } else {
+      io.emit("message", {
+        id: socket.userId,
+        user: socket.name,
+        message,
+      });
+
+      console.log(message);
+    }
   });
 
   socket.on("ban", async (user) => {
-    console.log("ban", user);
-    await User.findOneAndUpdate(
-      { _id: socket.userId },
-      { isBane: true },
-      { new: true }
-    );
+    if (socket.isAdmin) {
+      console.log("ban", user);
 
-    // io.emit("ban", { id: user.id });
-    if (socket.userId === user) {
-      socket.disconnect(true);
+      await User.findOneAndUpdate(
+        { _id: user.id },
+        { isBane: true },
+        { new: true }
+      );
+
+      const connectionToBan = connections[user.id];
+
+      if (connectionToBan) {
+        connectionToBan.disconnect(true);
+      }
+    }
+  });
+
+  socket.on("unban", async (user) => {
+    if (socket.isAdmin) {
+      console.log("unban", user);
+
+      await User.findOneAndUpdate(
+        { _id: user.id },
+        { isBane: false },
+        { new: true }
+      );
+    }
+  });
+
+  socket.on("mute", async (user) => {
+    let connectionToMute = connections[user._id];
+    let userToMute = connectionToMute.isMute;
+    console.log("connectionToMute", connectionToMute);
+
+    if (socket.isAdmin) {
+      console.log("mute", user);
+      console.log("connectionToMute", connectionToMute);
+
+      await User.findOneAndUpdate(
+        { _id: user._id },
+        { isMute: true },
+        { new: true }
+      );
+      connectionToMute = true;
+      return (forMessage = connectionToMute);
+    }
+  });
+
+  socket.on("unmute", async (user) => {
+    // connectionToMute = connections[user.isMute];
+    let connectionToUnMute = connections[user.isMute];
+    console.log("connectionToUnMute", connectionToUnMute);
+
+    if (socket.isAdmin) {
+      console.log("unmute", user);
+      console.log("connectionToUnMute", connectionToUnMute);
+      // connectionToMute = connections[!user.isMute];
+      // connectionToMute = false;
+
+      await User.findOneAndUpdate(
+        { _id: user._id },
+        { isMute: false },
+        { new: true }
+      );
+
+      connectionToUnMute = false;
+      return (forMessage = connectionToUnMute);
     }
   });
 });
