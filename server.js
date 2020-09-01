@@ -79,6 +79,7 @@ io.use(async (socket, next) => {
 
     socket.userId = payload._id;
     socket.name = payload.nickname;
+    socket.isBane = payload.isBane;
     next();
   } catch (err) {
     console.log("error in socket with token....");
@@ -87,6 +88,12 @@ io.use(async (socket, next) => {
 
 io.on("connection", async (socket) => {
   console.log("Connected: " + socket.name + " - id - ", socket.userId);
+
+  //if user ban
+  if (socket.isBane) {
+    socket.disconnect(true);
+    console.log(`user ${socket.userId} disconnect because "ban"`);
+  }
 
   //update user online
   await User.findOneAndUpdate(
@@ -135,6 +142,20 @@ io.on("connection", async (socket) => {
     });
 
     console.log(message);
+  });
+
+  socket.on("ban", async (user) => {
+    console.log("ban", user);
+    await User.findOneAndUpdate(
+      { _id: socket.userId },
+      { isBane: true },
+      { new: true }
+    );
+
+    // io.emit("ban", { id: user.id });
+    if (socket.userId === user) {
+      socket.disconnect(true);
+    }
   });
 });
 
