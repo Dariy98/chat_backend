@@ -29,9 +29,6 @@ const schema = new Schema({
   color: {
     type: String,
   },
-  lastMessageDate: {
-    type: Date,
-  },
 });
 
 module.exports = model("User", schema);

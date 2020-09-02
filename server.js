@@ -5,10 +5,9 @@ const cors = require("cors");
 const mongoose = require("mongoose");
 const bodyParser = require("body-parser");
 const jwt = require("jsonwebtoken");
-const schema = require("./validation");
+const schema = require("./validation/validation");
 
-const User = require("./User");
-const Message = require("./Message");
+const User = require("./models/User");
 const { request } = require("express");
 
 app.use(bodyParser.json());
@@ -16,7 +15,7 @@ app.use(cors());
 
 const secretKey = "32bDQZDSwdmseyrC";
 
-function generateToken(userModel) {
+const generateToken = (userModel) => {
   if (userModel && userModel.toObject) {
     const { password, ...rest } = userModel.toObject();
     return jwt.sign(rest, secretKey, {
@@ -25,7 +24,7 @@ function generateToken(userModel) {
   }
 
   return null;
-}
+};
 
 const corsOptions = {
   origin: "http://localhost:3000/",
@@ -42,7 +41,8 @@ app.post("/auth", async (request, response) => {
   const { error, value } = schema.validate(request.body);
 
   if (error) {
-    return response.json({ ValidationError });
+    response.json({ error });
+    throw error;
   }
 
   //find user in DB
@@ -83,7 +83,6 @@ io.use(async (socket, next) => {
     socket.name = payload.nickname;
     socket.isBane = payload.isBane;
     socket.isAdmin = payload.isAdmin;
-    socket.isMute = payload.isMute;
     socket.color = payload.color;
     next();
   } catch (err) {
@@ -141,10 +140,14 @@ io.on("connection", async (socket) => {
     const currentTime = new Date();
 
     if (user.isMute) {
-      console.log("user mute and can't send message");
+      return console.log("user mute and can't send message");
     }
     if (currentTime - socket.lastMessageDate < 15000) {
-      console.log("не прошло 15 секунд!");
+      console.log("limit 1 message in 15 secconds!");
+      socket.emit(
+        "message",
+        "You can't send message because limit 1 message in 15 secconds"
+      );
     } else {
       io.emit("message", {
         id: socket.userId,
@@ -261,15 +264,6 @@ const createUser = async (userPayload) => {
 
   return user;
 };
-
-// const createMessage = async (messageObj) => {
-//   console.log("save message in DB");
-//   const message = new Message(messageObj);
-//   await message.save();
-//   console.log("message is save");
-
-//   return message;
-// };
 
 const PORT = 3001;
 
