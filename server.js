@@ -84,6 +84,7 @@ io.use(async (socket, next) => {
     socket.isBane = payload.isBane;
     socket.isAdmin = payload.isAdmin;
     socket.isMute = payload.isMute;
+    socket.color = payload.color;
     next();
   } catch (err) {
     console.log("error in socket with token....");
@@ -100,7 +101,6 @@ io.on("connection", async (socket) => {
   }
 
   connections[socket.userId] = socket;
-  connections[socket.isMute] = socket.isMute;
 
   //update user online
   await User.findOneAndUpdate(
@@ -134,22 +134,27 @@ io.on("connection", async (socket) => {
     }
   });
 
-  // let connectionToMute;
-  let forMessage = false;
+  socket.on("chatMessage", async (message) => {
+    const user = await User.findById(socket.userId);
+    socket.user = user.toObject();
 
-  socket.on("chatMessage", (message) => {
-    console.log("in chat", forMessage);
-    // if (!connectionToMute) {
-    if (forMessage) {
+    const currentTime = new Date();
+
+    if (user.isMute) {
       console.log("user mute and can't send message");
+    }
+    if (currentTime - socket.lastMessageDate < 15000) {
+      console.log("не прошло 15 секунд!");
     } else {
       io.emit("message", {
         id: socket.userId,
-        user: socket.name,
-        message,
+        nickname: socket.name,
+        color: socket.color,
+        message: message.text,
+        date: new Date(),
       });
 
-      console.log(message);
+      socket.lastMessageDate = new Date();
     }
   });
 
@@ -168,6 +173,12 @@ io.on("connection", async (socket) => {
       if (connectionToBan) {
         connectionToBan.disconnect(true);
       }
+
+      const allUsers = await User.find({});
+      if (allUsers.length) {
+        socket.emit("result", allUsers);
+        socket.broadcast.emit("result", allUsers);
+      }
     }
   });
 
@@ -180,47 +191,48 @@ io.on("connection", async (socket) => {
         { isBane: false },
         { new: true }
       );
+
+      const allUsers = await User.find({});
+      if (allUsers.length) {
+        socket.emit("result", allUsers);
+        socket.broadcast.emit("result", allUsers);
+      }
     }
   });
 
   socket.on("mute", async (user) => {
-    let connectionToMute = connections[user._id];
-    let userToMute = connectionToMute.isMute;
-    console.log("connectionToMute", connectionToMute);
-
     if (socket.isAdmin) {
-      console.log("mute", user);
-      console.log("connectionToMute", connectionToMute);
+      console.log("mute", user.id);
 
       await User.findOneAndUpdate(
-        { _id: user._id },
+        { _id: user.id },
         { isMute: true },
         { new: true }
       );
-      connectionToMute = true;
-      return (forMessage = connectionToMute);
+
+      const allUsers = await User.find({});
+      if (allUsers.length) {
+        socket.emit("result", allUsers);
+        socket.broadcast.emit("result", allUsers);
+      }
     }
   });
 
   socket.on("unmute", async (user) => {
-    // connectionToMute = connections[user.isMute];
-    let connectionToUnMute = connections[user.isMute];
-    console.log("connectionToUnMute", connectionToUnMute);
-
     if (socket.isAdmin) {
-      console.log("unmute", user);
-      console.log("connectionToUnMute", connectionToUnMute);
-      // connectionToMute = connections[!user.isMute];
-      // connectionToMute = false;
+      console.log("unmute", user.id);
 
       await User.findOneAndUpdate(
-        { _id: user._id },
+        { _id: user.id },
         { isMute: false },
         { new: true }
       );
 
-      connectionToUnMute = false;
-      return (forMessage = connectionToUnMute);
+      const allUsers = await User.find({});
+      if (allUsers.length) {
+        socket.emit("result", allUsers);
+        socket.broadcast.emit("result", allUsers);
+      }
     }
   });
 });
@@ -249,6 +261,15 @@ const createUser = async (userPayload) => {
 
   return user;
 };
+
+// const createMessage = async (messageObj) => {
+//   console.log("save message in DB");
+//   const message = new Message(messageObj);
+//   await message.save();
+//   console.log("message is save");
+
+//   return message;
+// };
 
 const PORT = 3001;
 

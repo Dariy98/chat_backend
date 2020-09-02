@@ -11,6 +11,12 @@ const schema = Joi.object({
 
   isAdmin: Joi.boolean(),
 
+  isBane: Joi.boolean(),
+
+  isMute: Joi.boolean(),
+
+  color: Joi.string(),
+
   access_token: [Joi.string(), Joi.number()],
 });
 

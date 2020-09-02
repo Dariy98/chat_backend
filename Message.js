@@ -10,7 +10,7 @@ const schema = new Schema({
   text: {
     type: String,
   },
-  data: {
+  date: {
     type: Date,
   },
 });
