@@ -96,17 +96,14 @@ io.on("connection", async (socket) => {
   //if user ban
   if (socket.isBane) {
     socket.disconnect(true);
-    console.log(`user ${socket.userId} disconnect because "ban"`);
+    await updateOnlineStatus(socket, false);
+    return console.log(`user ${socket.userId} disconnect because "ban"`);
   }
 
   connections[socket.userId] = socket;
 
   //update user online
-  await User.findOneAndUpdate(
-    { _id: socket.userId },
-    { isOnline: true },
-    { new: true }
-  );
+  await updateOnlineStatus(socket, true);
 
   //get users and send for online list
   const allUsers = await User.find({});
@@ -119,11 +116,7 @@ io.on("connection", async (socket) => {
     console.log("Disconnected: " + socket.name);
 
     //update status online = false
-    await User.findOneAndUpdate(
-      { _id: socket.userId },
-      { isOnline: false },
-      { new: true }
-    );
+    await updateOnlineStatus(socket, false);
 
     //get users and send for online list
     const allUsers = await User.find({});
@@ -165,11 +158,7 @@ io.on("connection", async (socket) => {
     if (socket.isAdmin) {
       console.log("ban", user);
 
-      await User.findOneAndUpdate(
-        { _id: user.id },
-        { isBane: true },
-        { new: true }
-      );
+      await updateBan(user, true);
 
       const connectionToBan = connections[user.id];
 
@@ -189,11 +178,7 @@ io.on("connection", async (socket) => {
     if (socket.isAdmin) {
       console.log("unban", user);
 
-      await User.findOneAndUpdate(
-        { _id: user.id },
-        { isBane: false },
-        { new: true }
-      );
+      await updateBan(user, false);
 
       const allUsers = await User.find({});
       if (allUsers.length) {
@@ -207,11 +192,7 @@ io.on("connection", async (socket) => {
     if (socket.isAdmin) {
       console.log("mute", user.id);
 
-      await User.findOneAndUpdate(
-        { _id: user.id },
-        { isMute: true },
-        { new: true }
-      );
+      await updateMute(user, true);
 
       const allUsers = await User.find({});
       if (allUsers.length) {
@@ -225,11 +206,7 @@ io.on("connection", async (socket) => {
     if (socket.isAdmin) {
       console.log("unmute", user.id);
 
-      await User.findOneAndUpdate(
-        { _id: user.id },
-        { isMute: false },
-        { new: true }
-      );
+      await updateMute(user, false);
 
       const allUsers = await User.find({});
       if (allUsers.length) {
@@ -263,6 +240,36 @@ const createUser = async (userPayload) => {
   console.log("user is saved");
 
   return user;
+};
+
+const updateOnlineStatus = async (socket, value) => {
+  const user = User.findOneAndUpdate(
+    { _id: socket.userId },
+    { isOnline: value },
+    { new: true }
+  );
+
+  return user;
+};
+
+const updateMute = async (user, value) => {
+  const userIsMute = User.findOneAndUpdate(
+    { _id: user.id },
+    { isMute: value },
+    { new: true }
+  );
+
+  return userIsMute;
+};
+
+const updateBan = async (user, value) => {
+  const userIsBane = User.findOneAndUpdate(
+    { _id: user.id },
+    { isBane: value },
+    { new: true }
+  );
+
+  return userIsBane;
 };
 
 const PORT = 3001;
